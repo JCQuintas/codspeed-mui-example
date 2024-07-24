@@ -1,0 +1,41 @@
+name: Benchmarks
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'next'
+  pull_request:
+    branches:
+      - 'main'
+      - 'next'
+  # `workflow_dispatch` allows CodSpeed to trigger backtest
+  # performance analysis in order to generate initial data.
+  workflow_dispatch:
+
+jobs:
+  benchmarks:
+    name: Benchmarks Charts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
+        with:
+          run_install: false
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.3
+        with:
+          node-version: 20
+          cache: 'pnpm' # https://github.com/actions/setup-node/blob/main/docs/advanced-usage.md#caching-packages-dependencies
+      - run: pnpm install --frozen-lockfile
+      - run: pnpx playwright install --with-deps
+      # Ensure we are running on the prod version of our libs
+      # Only charts and license are needed for the benchmarks
+      # - run: pnpx lerna run --scope "@mui/{x-charts,x-license}*" build
+      - run: pnpm --filter @mui/x-license build
+      - run: pnpm --filter @mui/x-charts build
+      - run: pnpm --filter @mui/x-charts-pro build
+      - run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/CodSpeedHQ/runner/releases/download/v2.4.3/codspeed-runner-installer.sh | sh
+      - run: PATH=$PATH:$HOME/.cargo/env
+      - run: codspeed-runner --token=${{ secrets.CODSPEED_TOKEN }} -- pnpm test:performance:charts
+      # - run: pnpm test:performance:charts
